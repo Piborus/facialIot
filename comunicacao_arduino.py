@@ -1,16 +1,15 @@
-import serial
-import time
+import requests
 
-def enviar_comando_serial(comando):
-    # Configurar a comunicação serial com o Arduino
-    ser = serial.Serial('/dev/ttyACM0', 9600, timeout=1)  # Ajuste a porta conforme necessário
-    time.sleep(2)  # Aguarda o Arduino inicializar
-    
-    if comando == "ACESSO_LIBERADO":
-        ser.write(b'1')  # Envia o sinal de liberação
-        print("Comando de liberação enviado ao Arduino.")
-    elif comando == "ACESSO_NEGADO":
-        ser.write(b'0')  # Envia o sinal de negação
-        print("Comando de negação enviado ao Arduino.")
-    
-    ser.close()
+def enviar_comando_esp8266(comando):
+    """
+    Envia um comando para o ESP8266.
+    """
+    url = f"http://<IP_DO_ESP8266>:<PORTA>/{comando}"  # Substitua pelo IP e porta do ESP8266
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            print(f"Comando '{comando}' enviado com sucesso!")
+        else:
+            print(f"Erro ao enviar comando: {response.status_code}")
+    except Exception as e:
+        print(f"Erro de comunicação com o ESP8266: {e}")

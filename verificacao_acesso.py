@@ -2,41 +2,34 @@ import face_recognition
 import cv2
 import psycopg2
 from conexao_banco import conectar_banco
-from comunicacao_arduino import enviar_comando_serial
+from comunicacao_arduino import enviar_comando_esp8266
 import numpy as np
 
 def verificar_usuario():
-    """Captura o rosto do usuário via webcam e retorna a codificação facial."""
-    # Inicializa a webcam
+    """
+    Captura o rosto do usuário via webcam e retorna a codificação facial.
+    """
     video_capture = cv2.VideoCapture(0)
     print("Aguardando captura do rosto...")
 
     while True:
         ret, frame = video_capture.read()
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # Converte para RGB
-        face_locations = face_recognition.face_locations(rgb_frame, model='hog')  # Detecta rostos
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        face_locations = face_recognition.face_locations(rgb_frame)
 
-        if len(face_locations) > 0:  # Verifica se um rosto foi detectado
-            print("Rosto detectado! Processando codificação facial...")
+        if len(face_locations) > 0:
             face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
+            video_capture.release()
+            cv2.destroyAllWindows()
+            return face_encodings[0]
 
-            if face_encodings:
-                # Retorna a codificação do primeiro rosto detectado
-                video_capture.release()
-                cv2.destroyAllWindows()
-                return face_encodings[0]
-            else:
-                print("Não foi possível codificar o rosto. Tente novamente.")
-
-        # Mostra a imagem capturada ao vivo
-        cv2.imshow("Pressione 'q' para sair", frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
-    # Libera a câmera e fecha as janelas
     video_capture.release()
     cv2.destroyAllWindows()
     return None
+
 
 def autenticar_usuario(codificacao_usuario):
     """Autentica o usuário comparando a codificação facial com os dados no banco."""
@@ -63,28 +56,17 @@ def autenticar_usuario(codificacao_usuario):
             # Se encontrar um rosto correspondente, autoriza o acesso
             if resultado_comparacao[0]:
                 print(f"Acesso permitido! Bem-vindo, {nome}.")
-                enviar_comando_serial("ACESSO_LIBERADO")
-                return True
+                # Envia o comando ao ESP8266
+                enviar_comando_esp8266("ACESSO_LIBERADO")
+                return nome  # Retorna o nome do usuário autenticado
 
         # Se nenhuma correspondência for encontrada, nega o acesso
         print("Acesso negado! Rosto não encontrado no banco de dados.")
-        enviar_comando_serial("ACESSO_NEGADO")
-        return False
+        # Envia o comando de acesso negado ao ESP8266
+        enviar_comando_esp8266("ACESSO_NEGADO")
+        return None  # Retorna None quando o acesso é negado
     except Exception as e:
         print(f"Erro na autenticação: {e}")
     finally:
         cur.close()
         conn.close()
-
-if __name__ == "__main__":
-    try:
-        # Captura a codificação facial do usuário
-        codificacao_usuario = verificar_usuario()
-
-        if codificacao_usuario is not None:
-            # Autentica o usuário comparando com o banco de dados
-            autenticar_usuario(codificacao_usuario)
-        else:
-            print("Nenhum rosto detectado ou erro ao capturar codificação facial.")
-    except Exception as e:
-        print(f"Erro no processo principal: {e}")
